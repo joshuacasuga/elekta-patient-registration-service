@@ -10,7 +10,7 @@ const ALLOWED = new Set(["breast", "lung", "prostate", "unspecified", null]);
 export const patientService = {
   // POST /v1/patients - Register new patient
   async registerPatient(input) {
-    const created = patientRepo.register({
+    const created = await patientRepo.register({
       medicalRecordNumber: input.medicalRecordNumber,
       name: input.name,
       age: input.age,
@@ -48,7 +48,7 @@ export const patientService = {
   },
 
   // PUT /v1/patients/:id/diagnosis
-  setDiagnosis(id, admittingDiagnosis) {
+  async setDiagnosis(id, admittingDiagnosis) {
     if (!ALLOWED.has(admittingDiagnosis)) {
       const error = new Error("Invalid admittingDiagnosis");
       error.code = "BAD_REQUEST";
@@ -58,15 +58,8 @@ export const patientService = {
     return patientRepo.setDiagnosis(id, admittingDiagnosis);
   },
 
-  deleteIfAllowed(id) {
-    const p = patientRepo.get(id);
-    if (!p) throw Object.assign(new Error("Not found"), { code: "NOT_FOUND" });
-    if (p.admittingDiagnosis) throw Object.assign(new Error("Cannot delete after diagnosis"), { code: "NOT_DELETABLE" });
-    patientRepo.softDelete(id);
-  },
-
+  // DELETE /v1/patients/:id
+  async deletePatient(id) {
+    return patientRepo.delete(id);
+  }
 };
-
-// seeds via service to keep invariants correct
-//patientService.register({ medicalRecordNumber: "MRN-100001", name: { first: "Ada", last: "Lovelace" }, age: 37, gender: "female", contacts: [{ type: "email", value: "ada@example.org" }] });
-//patientService.register({ medicalRecordNumber: "MRN-100002", name: { first: "Alan", last: "Turing" }, age: 41, gender: "male", contacts: [{ type: "mobile", value: "+1-555-0000" }] });

@@ -3,8 +3,8 @@ import { patientService } from "../services/patientService.js";
 export const patientController = {
   async createPatient(req, res) {
     try {
-      const { medicalRecordNumber, name, age, gender, contacts } = req.body || {};
-      if (!medicalRecordNumber || !name?.first || !name?.last || typeof age !== "number" || !gender) {
+      const { name, age, gender, contacts } = req.body || {};
+      if (!name?.first || !name?.last || typeof age !== "number" || !gender) {
         return res.status(400).json({
           code: "BAD_REQUEST", 
           message: "Missing required fields"
@@ -12,7 +12,6 @@ export const patientController = {
       }
 
       const patient = await patientService.registerPatient({ 
-        medicalRecordNumber, 
         name, 
         age, 
         gender, 
@@ -63,51 +62,59 @@ export const patientController = {
   },
 
   async getPatientsList(req, res) {
-    const page = Math.max(parseInt(String(req.query.page ?? "1"), 10), 1);
-    const pageSize = Math.min(Math.max(parseInt(String(req.query.pageSize ?? "25"), 10), 1), 100);
-    const name = typeof req.query.name === "string" ? req.query.name.trim() : undefined;
-    const mrn = typeof req.query.mrn === "string" ? req.query.mrn.trim() : undefined;
-    const includeDeleted = String(req.query.includeDeleted ?? "false") === "true";
+    try{
+      const page = Math.max(parseInt(String(req.query.page ?? "1"), 10), 1);
+      const pageSize = Math.min(Math.max(parseInt(String(req.query.pageSize ?? "25"), 10), 1), 100);
+      const name = typeof req.query.name === "string" ? req.query.name.trim() : undefined;
+      const mrn = typeof req.query.mrn === "string" ? req.query.mrn.trim() : undefined;
+      const includeDeleted = String(req.query.includeDeleted ?? "false") === "true";
 
-    const sortParam = (req.query.sort) || "createdAt:desc";
-    const [sortFieldRaw, sortDirRaw] = String(sortParam).split(":");
-    const allowedSort = new Set(["createdAt", "name", "mrn"]);
-    const sortField = allowedSort.has(sortFieldRaw) ? sortFieldRaw : "createdAt";
-    const sortDir = sortDirRaw === "asc" ? "asc" : "desc";
+      const sortParam = (req.query.sort) || "createdAt:desc";
+      const [sortFieldRaw, sortDirRaw] = String(sortParam).split(":");
+      const allowedSort = new Set(["createdAt", "name", "mrn"]);
+      const sortField = allowedSort.has(sortFieldRaw) ? sortFieldRaw : "createdAt";
+      const sortDir = sortDirRaw === "asc" ? "asc" : "desc";
 
-    const { items, total } = patientService.list({ page, pageSize, name, mrn, includeDeleted, sortField, sortDir });
+      const { items, total } = await patientService.getPatientsList({ page, pageSize, name, mrn, includeDeleted, sortField, sortDir });
 
-    const base = "/v1/patients";
-    const q = new URLSearchParams({
-      ...(name ? { name } : {}),
-      ...(mrn ? { mrn } : {}),
-      ...(includeDeleted ? { includeDeleted: "true" } : {}),
-      sort: `${sortField}:${sortDir}`,
-      pageSize: String(pageSize),
-    });
-    const lastPage = Math.max(Math.ceil(total / pageSize), 1);
-    const links = [];
-    q.set("page", "1");
-    links.push(`<${base}?${q.toString()}>; rel="first"`);
-    if (page > 1) {
-      q.set("page", String(page - 1));
-      links.push(`<${base}?${q.toString()}>; rel="prev"`);
+      const base = "/v1/patients";
+      const q = new URLSearchParams({
+        ...(name ? { name } : {}),
+        ...(mrn ? { mrn } : {}),
+        ...(includeDeleted ? { includeDeleted: "true" } : {}),
+        sort: `${sortField}:${sortDir}`,
+        pageSize: String(pageSize),
+      });
+      const lastPage = Math.max(Math.ceil(total / pageSize), 1);
+      const links = [];
+      q.set("page", "1");
+      links.push(`<${base}?${q.toString()}>; rel="first"`);
+      if (page > 1) {
+        q.set("page", String(page - 1));
+        links.push(`<${base}?${q.toString()}>; rel="prev"`);
+      }
+      if (page < lastPage) {
+        q.set("page", String(page + 1));
+        links.push(`<${base}?${q.toString()}>; rel="next"`);
+      }
+      q.set("page", String(lastPage));
+      links.push(`<${base}?${q.toString()}>; rel="last"`);
+
+      res.set("X-Total-Count", String(total)).set("Link", links.join(", ")).status(200).json({
+        page,
+        pageSize,
+        total,
+        sort: { field: sortField, direction: sortDir },
+        filters: { ...(name && { name }), ...(mrn && { mrn }), ...(includeDeleted && { includeDeleted }) },
+        items
+      });
+    } catch (error) {
+      console.error("GET /patients failed:", error);
+      res.status(500).json({
+        success: false,
+        message: "Internal server error"
+      });
     }
-    if (page < lastPage) {
-      q.set("page", String(page + 1));
-      links.push(`<${base}?${q.toString()}>; rel="next"`);
-    }
-    q.set("page", String(lastPage));
-    links.push(`<${base}?${q.toString()}>; rel="last"`);
-
-    res.set("X-Total-Count", String(total)).set("Link", links.join(", ")).status(200).json({
-      page,
-      pageSize,
-      total,
-      sort: { field: sortField, direction: sortDir },
-      filters: { ...(name && { name }), ...(mrn && { mrn }), ...(includeDeleted && { includeDeleted }) },
-      items
-    });
   },
 
   async updatePatient(req, res) {
@@ -183,14 +190,35 @@ export const patientController = {
     }
   },
 
-  del(req, res) {
+  async deletePatient(req, res) {
     try {
-      patientService.deleteIfAllowed(req.params.id);
-      res.sendStatus(204);
-    } catch (e) {
-      if (e && e.code === "NOT_DELETABLE") return res.status(409).json({ code: e.code, message: e.message });
-      if (e && e.code === "NOT_FOUND") return res.status(404).json({ code: e.code, message: e.message });
-      res.status(400).json({ code: "BAD_REQUEST", message: e?.message || "Bad request" });
+      const id = req.params.id;
+      
+      await patientService.deletePatient(id);
+
+      return res.status(204).send();
+    } catch (error) {
+      if (error.code === "NOT_FOUND") {
+        return res.status(404).json({
+          success: false,
+          code: "NOT_FOUND",
+          message: "Patient not found"
+        });
+      }
+
+      if (error.code === "FORBIDDEN_DELETE") {
+        return res.status(409).json({
+          success: false,
+          code: "FORBIDDEN_DELETE",
+          message: "Cannot delete a patient after admitting diagnosis has been set"
+        });
+      }
+
+      console.error("DELETE /patients/:id failed:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Internal server error"
+      });
     }
   }
 };

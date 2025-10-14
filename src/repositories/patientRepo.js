@@ -1,5 +1,6 @@
 import { sql } from "../config/db.js";
 
+// Helper functions
 const rowToPatient = (r) => ({
     id: r.id,
     medicalRecordNumber: r.medical_record_number,
@@ -32,9 +33,21 @@ const assignByDiagnosis = (d) =>
         ? { physician: "SUSAN_JONES", dept: "J" }
         : { physician: "BEN_SMITH", dept: "S" };
 
+async function generateNextMrn() {
+    const [result] = await sql`
+        SELECT COALESCE(MAX(CAST(SUBSTRING(medical_record_number, 5) AS INTEGER)), 0) + 1 AS next
+        FROM patients;
+    `;
+    const padded = String(result.next).padStart(6, "0");
+    return `MRN-${padded}`;
+}
+
+// Patient Repo SQL Functions
 export const patientRepo = {
     async register(data) {
         try {
+            const mrn = data.medicalRecordNumber || await generateNextMrn();
+
             const [row] = await sql`
                 INSERT INTO patients (
                     medical_record_number,
@@ -49,7 +62,7 @@ export const patientRepo = {
                     department
                 )
                 VALUES (
-                    ${data.medicalRecordNumber},
+                    ${mrn},
                     ${data.name.first},
                     ${data.name.last},
                     ${data.name.middle ?? null},
@@ -64,9 +77,9 @@ export const patientRepo = {
             `;
             return rowToPatient(row);
         } catch (error) {
-            if (e.code === "23505") {
+            if (error.code === "23505") {
                 const err = new Error("MRN already exists");
-                error.code = "MRN_NOT_UNIQUE";
+                err.code = "MRN_NOT_UNIQUE";
                 throw err
             }
             throw error;
@@ -180,5 +193,33 @@ export const patientRepo = {
         `;
 
         return rowToPatient(updated[0]);
+    },
+
+    async delete(id) {
+        const [curr] = await sql`
+            SELECT * FROM patients WHERE id = ${id} LIMIT 1
+        `;
+
+        if (!curr || curr.is_deleted) {
+            const error = new Error("Not found");
+            error.code = "NOT_FOUND";
+            throw error;
+        }
+
+        if (curr.admittingDiagnosis) {
+            const error = new Error("Cannot delete patient after admitting diagnosis has been set");
+            error.code = "FORBIDDEN_DELETE";
+            throw error;
+        }
+
+        const result = await sql`
+            UPDATE patients SET 
+                is_deleted = true,
+                updated_at = now()
+            WHERE id = ${id}
+            RETURNING *
+        `;
+
+        return { id, deleted: true };
     }
 };

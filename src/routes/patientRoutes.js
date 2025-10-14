@@ -8,5 +8,6 @@ router.get('/:id', patientController.getPatientById);
 router.get('/', patientController.getPatientsList);
 router.patch('/:id', patientController.updatePatient);
 router.put('/:id/diagnosis', patientController.setPatientDiagnosis);
+router.delete('/:id', patientController.deletePatient);
 
 export default router;
