@@ -256,6 +256,12 @@ Allowed __only if__ the patient has no admitting diagnosis.
 
 ### Future Enhancements & Open Questions
 #### Possible Enhancements
+* Convert `contacts` from JSONB to normalized relational database table (`id, patient_id, type, value, preffered`)
+  * Create CRUD endpoints such as:
+    * `GET /v1/patients/:id/contacts` - list all contacts for a patient
+    * `POST /v1/patients/:id/contacts` - add a new contact (emali, phone, etc)
+    * `PATCH /v1/patients/:id/contacts/:contactId` - update contact info or mark as preferred
+    * `DELETE /v1/patients/:id/contacts/:contactId` - remove a contact record
 * Implement authentication and role-based access (admin vs clinical staff)
   * Use JWT authentication, hash passwords, and create a middleware that verifies the token and checks for `role`
 * Implement ETag/If-Match for optimistic cocurrency control
