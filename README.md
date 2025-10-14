@@ -94,7 +94,77 @@ __Response__:
 
 ---
 
-#### 3. Update Patient Demographics
+#### 3. List/Search Patients
+__GET__ `/v1/patients`
+
+Supports pagination, seach, and sorting by name, MRN, or creation date.
+
+__Query Params__:
+| Param      | Type   | Description                         |
+| ---------- | ------ | ----------------------------------- |
+| `page`     | int    | Page number (default 1)             |
+| `pageSize` | int    | Items per page (default 25)         |
+| `name`     | string | Search by first+last name substring |
+| `mrn`      | string | Filter by MRN                       |
+| `sort`     | string | e.g., `name:asc`, `createdAt:desc`  |
+
+__Response__:
+```
+{
+    "page": 1,
+    "pageSize": 3,
+    "total": 2,
+    "sort": {
+        "field": "name",
+        "direction": "asc"
+    },
+    "filters": {
+        "name": "smi"
+    },
+    "items": [
+        {
+            "id": "72e57ad5-a93c-4ee6-a826-7068d9457ba6",
+            "medicalRecordNumber": "MRN-000002",
+            "name": {
+                "first": "James",
+                "last": "Smith"
+            },
+            "age": 22,
+            "gender": "male",
+            "contacts": [],
+            "admittingDiagnosis": null,
+            "attendingPhysician": null,
+            "department": null,
+            "createdAt": "2025-10-14T20:24:15.135Z",
+            "updatedAt": "2025-10-14T20:24:15.135Z",
+            "version": 1,
+            "isDeleted": false
+        },
+        {
+            "id": "fec270ce-d97a-4a44-b478-58799c6ca6b3",
+            "medicalRecordNumber": "MRN-00001",
+            "name": {
+                "first": "Jane",
+                "last": "Smith"
+            },
+            "age": 35,
+            "gender": "female",
+            "contacts": [],
+            "admittingDiagnosis": "prostate",
+            "attendingPhysician": "BEN_SMITH",
+            "department": "S",
+            "createdAt": "2025-10-14T01:29:48.156Z",
+            "updatedAt": "2025-10-14T19:56:47.453Z",
+            "version": 5,
+            "isDeleted": false
+        }
+    ]
+}
+```
+
+---
+
+#### 4. Update Patient Demographics
 __PATCH__ `/v1/patients/:id`
 
 Updates patient's name, age, gender, or contacts.
@@ -121,7 +191,7 @@ __Response__:
 
 ---
 
-#### 4. Assign Admitting Diagnosis
+#### 5. Assign Admitting Diagnosis
 __PUT__ `/v1/patients/:id/diagnosis`
 
 Sets the `admittingDiagnosis` and auto-assigns attending physician and department.
@@ -149,7 +219,7 @@ __Response__:
 
 ---
 
-#### 5. Delete Patient (if allowed)
+#### 6. Delete Patient (if allowed)
 __DELETE__ `/v1/patients/:id`
 
 Allowed __only if__ the patient has no admitting diagnosis.
@@ -187,9 +257,13 @@ Allowed __only if__ the patient has no admitting diagnosis.
 ### Future Enhancements & Open Questions
 #### Possible Enhancements
 * Implement authentication and role-based access (admin vs clinical staff)
+  * Use JWT authentication, hash passwords, and create a middleware that verifies the token and checks for `role`
 * Implement ETag/If-Match for optimistic cocurrency control
+  * On reads/creates, return ETag version
+  * On PATCH/PUT/DELETE, require `If-Match`
 * Add unit and integration tests with Jest
 * Add audit logging for all write operations
+  * Add an `audit_logs` table (`id, actor_id, action, entity, entity_id, before, after, at`) and insert from the service layer on every create/update/delete.
 
 #### Open Questions
 * Without a user interface, where will input data be coming from?
