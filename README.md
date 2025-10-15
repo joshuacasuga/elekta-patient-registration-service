@@ -1,5 +1,5 @@
 ### Overview
-The __Patient Registration Service__ is a headless RESTful API built with __Node.js__ that simulates the capture and management of patient registration information for a cancer clinic. It demonstrates backend service design using layered architecture (Controller → Service → Repository), PostgreSQL persistence via __Supabase__, and basic concurrency and validation rules.
+The __Patient Registration Service__ is a headless RESTful API built with __Node.js__ that simulates the capture and management of patient registration information for a cancer clinic. It demonstrates backend service design using layered architecture (Controller → Service → Repository), PostgreSQL persistence via __Supabase__, and basic validation rules.
 This service supports:
 * Patient registration (create)
 * Patient retrieval (by ID, or list/search)
